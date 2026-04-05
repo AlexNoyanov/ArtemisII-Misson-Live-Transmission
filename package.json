@@ -1,0 +1,14 @@
+{
+  "name": "artemis-ii-telemetry",
+  "type": "module",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Artemis II live telemetry dashboard (JPL Horizons)",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

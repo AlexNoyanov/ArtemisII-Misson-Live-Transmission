@@ -1,0 +1,3 @@
+{
+  "functions": { "api/horizons.js": { "maxDuration": 30 } }
+}
