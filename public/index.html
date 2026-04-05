@@ -125,23 +125,39 @@
 
     <div class="rule"></div>
 
-    <main class="hero">
-      <section class="hero-cell">
-        <div class="pipe-label">| SPEED</div>
-        <div class="hero-metric">
-          <span id="speed-val" class="hero-num">—</span>
-          <span class="hero-unit">MPH</span>
+    <div class="hero-stack">
+      <div class="live-video">
+        <div class="pipe-label live-video-label">| LIVE VIDEO</div>
+        <div class="live-video-frame">
+          <iframe
+            src="https://www.youtube.com/embed/m3kR2KK8TEs"
+            title="Artemis mission live video transmission (YouTube)"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen
+            loading="lazy"
+          ></iframe>
         </div>
-      </section>
-      <div class="hero-divider" aria-hidden="true"></div>
-      <section class="hero-cell">
-        <div class="pipe-label">| DISTANCE FROM EARTH</div>
-        <div class="hero-metric">
-          <span id="dist-val" class="hero-num">—</span>
-          <span class="hero-unit">MI</span>
-        </div>
-      </section>
-    </main>
+      </div>
+
+      <main class="hero">
+        <section class="hero-cell">
+          <div class="pipe-label">| SPEED</div>
+          <div class="hero-metric">
+            <span id="speed-val" class="hero-num">—</span>
+            <span class="hero-unit">MPH</span>
+          </div>
+        </section>
+        <div class="hero-divider" aria-hidden="true"></div>
+        <section class="hero-cell">
+          <div class="pipe-label">| DISTANCE FROM EARTH</div>
+          <div class="hero-metric">
+            <span id="dist-val" class="hero-num">—</span>
+            <span class="hero-unit">MI</span>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <div class="rule"></div>
 
