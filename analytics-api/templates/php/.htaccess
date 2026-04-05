@@ -1,0 +1,16 @@
+# Block direct browser/curl access to secrets if config.php lives in this folder (PHP include still works).
+<FilesMatch "^config\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+  Header set Access-Control-Allow-Methods "POST, OPTIONS"
+  Header set Access-Control-Allow-Headers "Content-Type, X-Analytics-Token"
+</IfModule>

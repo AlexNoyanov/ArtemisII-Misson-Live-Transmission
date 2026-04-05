@@ -149,6 +149,9 @@ export function logPageVisit() {
         console.info("[analytics]", r.status, text || "(empty body)");
         try {
           const j = text ? JSON.parse(text) : null;
+          if (j && j.ok === true) {
+            console.info("[analytics] stored row id", j.id, "(check DB analytics.page_visits)");
+          }
           if (j && j.ok === false) {
             console.warn("[analytics] server rejected:", j.error, j.hint || "");
           }

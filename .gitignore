@@ -10,4 +10,8 @@ analytics-api/php/*
 # Optional local overrides for analytics URL/token (never commit real tokens).
 public/analytics-endpoint.local.js
 
+# Never commit filled PHP DB configs (only config.example.php is tracked).
+analytics-api/templates/php/config.php
+analytics-api/templates/php/analytics-config.php
+
 .DS_Store

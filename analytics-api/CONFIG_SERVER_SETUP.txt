@@ -1,0 +1,58 @@
+================================================================================
+Analytics MySQL config — where to get it, how to save on server, Git safety
+================================================================================
+
+WHERE TO GET THE TEMPLATE (safe to commit, no secrets)
+  File in this repo:
+    analytics-api/templates/php/config.example.php
+  It contains placeholders only (YOUR_DB_PASSWORD_HERE).
+
+WHAT YOU CREATE (never commit)
+  1. Copy config.example.php to a new file on your computer.
+  2. Rename to config.php (keep the .php extension).
+  3. Edit in a text editor (UTF-8, no BOM):
+       - Set 'pass' to your real MySQL password (from hosting panel).
+       - Fix 'dsn' if your host requires localhost or a unix_socket (see comments in the file).
+       - Keep 'user' as app_logger (or whatever user you created for INSERT on page_visits).
+  4. Save. Do not add this file to Git.
+
+WHERE TO UPLOAD ON THE SERVER (pick one)
+
+  Option A — simplest
+    Path:  .../Apps/data/api/config.php
+    Same directory as visit.php.
+
+  Option B — slightly safer (config not next to public scripts)
+    Path:  .../Apps/data/analytics-config.php
+    Parent folder of "api" (sibling of the api folder, not inside it).
+    visit.php checks this path automatically if api/config.php is missing.
+
+VERIFY
+  curl -sS -X POST 'https://YOURDOMAIN/Apps/data/api/visit.php' \
+    -H 'Content-Type: application/json' \
+    -d '{"pageUrl":"https://test.com"}'
+  Expect: {"ok":true,"id":"..."}
+  If "Database connection failed": wrong host, user, password, or dbname in DSN.
+  If "Write failed": user lacks INSERT or table page_visits missing — run db/analytics_init.sql
+
+GIT
+  Only config.example.php belongs in the repo.
+  Real config.php / analytics-config.php are listed in .gitignore.
+  If you ever ran "git add -f" on a secret file, rotate the DB password and remove the file from history.
+
+EXPECTED NULL COLUMNS
+  country_code, region, city — stay NULL unless you configure MaxMind GeoLite2 (geoip_db in config.php).
+  referer — often NULL if the visitor opened the page directly (no previous page) or the browser
+    stripped the referrer; that is normal.
+
+TROUBLESHOOTING — “API fixed but phpMyAdmin shows no rows”
+  1. In phpMyAdmin, select database **analytics** (left sidebar), then table **page_visits**, click **Browse**.
+     Do not stay on “information_schema” or another database.
+  2. From your PC run the VERIFY curl above. If it returns {"ok":true,"id":"..."}, rows ARE being written;
+     refresh Browse or run:  SELECT * FROM page_visits ORDER BY id DESC LIMIT 20;
+  3. On your telemetry site, open DevTools → Network, filter “visit”, reload. You should see POST 200 to visit.php.
+     Or add ?analytics_debug=1 to the page URL and check Console for [analytics] lines.
+  4. Disable ad-block / “tracking protection” for a test — some block requests to third-party domains.
+  5. Deploy the latest public/analytics-client.js (cache-bust or hard refresh) so logging runs.
+
+================================================================================

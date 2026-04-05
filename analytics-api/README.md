@@ -12,6 +12,8 @@ It runs `USE analytics;` and `CREATE TABLE page_visits ...`. Commented at the bo
 
 ## 2. Server database config (required — without this, the table stays empty)
 
+Step-by-step plaintext: **`analytics-api/CONFIG_SERVER_SETUP.txt`**.
+
 The API **will not insert rows** until PHP can read credentials. Choose **one** layout:
 
 **A. Same folder as `visit.php` (simplest)**  
@@ -23,7 +25,7 @@ The API **will not insert rows** until PHP can read credentials. Choose **one** 
 
 Steps:
 
-1. Copy `templates/php/config.example.php` to the chosen path as `config.php` or `analytics-config.php` as above.
+1. Copy **`templates/php/config.example.php`** (template only — no secrets) to the server path below; rename to **`config.php`** or **`analytics-config.php`** as appropriate. Filled configs are **gitignored** under `templates/php/` if you ever create them locally by mistake.
 2. Set `'pass'` and check `'dsn'` (`dbname=analytics`, host often `127.0.0.1` or `localhost` on shared hosting).
 3. **Verify:** `curl -sS -X POST 'https://YOURDOMAIN/Apps/data/api/visit.php' -H 'Content-Type: application/json' -d '{"pageUrl":"https://test.com"}'` must return `{"ok":true,"id":"…"}`. If you see `"Server not configured"`, the config file is still missing or unreadable.
 
