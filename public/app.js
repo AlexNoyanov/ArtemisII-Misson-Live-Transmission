@@ -1,3 +1,5 @@
+import { logPageVisit } from "./analytics-client.js";
+
 /** Artemis II published launch (Horizons fallback / cross-check). */
 const LAUNCH_MS = Date.parse("2026-04-01T22:35:12.000Z");
 
@@ -322,6 +324,8 @@ async function tick(resolveUrl) {
 }
 
 function main() {
+  logPageVisit();
+
   const resolveUrl = apiPath();
   if (!resolveUrl) {
     setBanner(

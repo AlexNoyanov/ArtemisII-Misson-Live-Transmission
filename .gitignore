@@ -2,4 +2,12 @@
 .env.*
 !.env.example
 node_modules/
+
+# Live PHP ingest + DB secrets (copy from analytics-api/templates/php/ for upload).
+analytics-api/php/*
+!analytics-api/php/README.md
+
+# Optional local overrides for analytics URL/token (never commit real tokens).
+public/analytics-endpoint.local.js
+
 .DS_Store

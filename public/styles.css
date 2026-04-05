@@ -321,6 +321,18 @@ body {
   height: 100%;
 }
 
+.tile-icon--crew {
+  width: auto;
+  max-width: 100%;
+  height: 32px;
+}
+
+.tile-icon--crew svg {
+  width: auto;
+  height: 32px;
+  display: block;
+}
+
 .tile-val {
   font-size: clamp(0.95rem, 2vw, 1.15rem);
   font-weight: 600;
@@ -350,13 +362,12 @@ body {
     text-align: center;
   }
 
-  .header-left,
-  .header-right {
+  .header-left {
     justify-self: center;
   }
 
   .header-right {
-    flex-direction: column;
+    display: none;
   }
 
   .live-block {
@@ -385,6 +396,18 @@ body {
 
   .hero-cell:last-child .hero-metric {
     justify-content: center;
+    text-align: center;
+  }
+
+  .hero-cell .hero-metric {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .pipe-label {
+    width: 100%;
+    text-align: center;
   }
 
   .grid-4 {

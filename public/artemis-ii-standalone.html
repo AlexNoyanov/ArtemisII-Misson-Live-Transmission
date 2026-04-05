@@ -341,6 +341,16 @@
         width: 100%;
         height: 100%;
       }
+      .tile-icon--crew {
+        width: auto;
+        max-width: 100%;
+        height: 32px;
+      }
+      .tile-icon--crew svg {
+        width: auto;
+        height: 32px;
+        display: block;
+      }
       .tile-val {
         font-size: clamp(0.95rem, 2vw, 1.15rem);
         font-weight: 600;
@@ -365,12 +375,11 @@
           grid-template-columns: 1fr;
           text-align: center;
         }
-        .header-left,
-        .header-right {
+        .header-left {
           justify-self: center;
         }
         .header-right {
-          flex-direction: column;
+          display: none;
         }
         .live-block {
           align-items: center;
@@ -393,6 +402,16 @@
         }
         .hero-cell:last-child .hero-metric {
           justify-content: center;
+          text-align: center;
+        }
+        .hero-cell .hero-metric {
+          width: 100%;
+          justify-content: center;
+          text-align: center;
+        }
+        .pipe-label {
+          width: 100%;
+          text-align: center;
         }
         .grid-4 {
           grid-template-columns: repeat(2, 1fr);
@@ -487,7 +506,7 @@
 
     <div class="hero-stack">
       <div class="live-video">
-        <div class="pipe-label live-video-label">| LIVE VIDEO</div>
+        <div class="pipe-label live-video-label">LIVE VIDEO</div>
         <div class="live-video-frame">
           <iframe
             id="live-youtube-embed"
@@ -540,7 +559,7 @@
 
       <main class="hero">
         <section class="hero-cell">
-          <div class="pipe-label">| SPEED</div>
+          <div class="pipe-label">SPEED</div>
           <div class="hero-metric">
             <span id="speed-val" class="hero-num">—</span>
             <span class="hero-unit">MPH</span>
@@ -548,7 +567,7 @@
         </section>
         <div class="hero-divider" aria-hidden="true"></div>
         <section class="hero-cell">
-          <div class="pipe-label">| DISTANCE FROM EARTH</div>
+          <div class="pipe-label">DISTANCE FROM EARTH</div>
           <div class="hero-metric">
             <span id="dist-val" class="hero-num">—</span>
             <span class="hero-unit">MI</span>
@@ -592,16 +611,32 @@
         <div id="fuel-val" class="tile-val muted" title="Not published in open data.">N/A</div>
       </div>
       <div class="tile">
-        <span class="tile-icon" aria-hidden="true">
-          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
-            <circle cx="7" cy="10" r="2.2" />
-            <path d="M7 12v6 M5 22h4" />
-            <circle cx="16" cy="10" r="2.2" />
-            <path d="M16 12v6 M14 22h4" />
-            <circle cx="25" cy="10" r="2.2" />
-            <path d="M25 12v6 M23 22h4" />
-            <circle cx="12" cy="24" r="2.2" />
-            <path d="M12 26v2 M10 30h4" />
+        <span class="tile-icon tile-icon--crew" aria-hidden="true">
+          <svg viewBox="0 0 128 32" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+            <g transform="translate(0 0)">
+              <circle cx="16" cy="12.5" r="7" />
+              <path d="M10 14c1.5 2.6 3.8 4.2 6 4.2s4.5-1.6 6-4.2" opacity="0.5" />
+              <path d="M11.5 20h9" />
+              <path d="M6.5 26.5c0-3.2 3.9-5.8 9.5-5.8s9.5 2.6 9.5 5.8" />
+            </g>
+            <g transform="translate(32 0)">
+              <circle cx="16" cy="12.5" r="7" />
+              <path d="M10 14c1.5 2.6 3.8 4.2 6 4.2s4.5-1.6 6-4.2" opacity="0.5" />
+              <path d="M11.5 20h9" />
+              <path d="M6.5 26.5c0-3.2 3.9-5.8 9.5-5.8s9.5 2.6 9.5 5.8" />
+            </g>
+            <g transform="translate(64 0)">
+              <circle cx="16" cy="12.5" r="7" />
+              <path d="M10 14c1.5 2.6 3.8 4.2 6 4.2s4.5-1.6 6-4.2" opacity="0.5" />
+              <path d="M11.5 20h9" />
+              <path d="M6.5 26.5c0-3.2 3.9-5.8 9.5-5.8s9.5 2.6 9.5 5.8" />
+            </g>
+            <g transform="translate(96 0)">
+              <circle cx="16" cy="12.5" r="7" />
+              <path d="M10 14c1.5 2.6 3.8 4.2 6 4.2s4.5-1.6 6-4.2" opacity="0.5" />
+              <path d="M11.5 20h9" />
+              <path d="M6.5 26.5c0-3.2 3.9-5.8 9.5-5.8s9.5 2.6 9.5 5.8" />
+            </g>
           </svg>
         </span>
         <div class="label-small">CREW</div>
@@ -615,6 +650,10 @@
       party. Not an official NASA product. Do not embed API keys in HTML.
     </p>
 
+    <script type="module">
+      import { logPageVisit } from "./analytics-client.js";
+      logPageVisit();
+    </script>
     <script>
       (function () {
         var DIRECT_ORBIT = "https://artemis.cdnspace.ca/api/orbit";
