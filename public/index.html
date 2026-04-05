@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Artemis II — Live Telemetry</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -130,13 +131,52 @@
         <div class="pipe-label live-video-label">| LIVE VIDEO</div>
         <div class="live-video-frame">
           <iframe
-            src="https://www.youtube.com/embed/m3kR2KK8TEs"
+            id="live-youtube-embed"
             title="Artemis mission live video transmission (YouTube)"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerpolicy="strict-origin-when-cross-origin"
             allowfullscreen
             loading="lazy"
           ></iframe>
+          <a
+            id="live-youtube-launch"
+            class="live-youtube-launch"
+            href="https://www.youtube.com/watch?v=m3kR2KK8TEs"
+            target="_blank"
+            rel="noopener noreferrer"
+            hidden
+            aria-label="Watch live stream on YouTube"
+          >
+            <img
+              class="live-youtube-poster"
+              src="https://img.youtube.com/vi/m3kR2KK8TEs/hqdefault.jpg"
+              alt=""
+              width="480"
+              height="360"
+              decoding="async"
+            />
+            <span class="live-youtube-launch-shade" aria-hidden="true"></span>
+            <span class="live-youtube-launch-ui">
+              <span class="live-youtube-play" aria-hidden="true">▶</span>
+              <span class="live-youtube-launch-text">Watch live on YouTube</span>
+            </span>
+          </a>
+          <script>
+            (function () {
+              var vid = "m3kR2KK8TEs";
+              var iframe = document.getElementById("live-youtube-embed");
+              var launch = document.getElementById("live-youtube-launch");
+              var useLaunch = location.protocol === "file:";
+              if (useLaunch) {
+                iframe.style.display = "none";
+                launch.hidden = false;
+                return;
+              }
+              launch.hidden = true;
+              var q = "rel=0&modestbranding=1&origin=" + encodeURIComponent(location.origin || "");
+              iframe.src = "https://www.youtube-nocookie.com/embed/" + vid + "?" + q;
+            })();
+          </script>
         </div>
       </div>
 

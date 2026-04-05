@@ -10,6 +10,17 @@ const KPS_TO_MPH = 2236.9362920544;
 const POLL_LIVE_MS = 8000;
 const POLL_HORIZONS_MS = 30000;
 
+const JINA_ORBIT = "https://r.jina.ai/http://artemis.cdnspace.ca/api/orbit";
+
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+    return AbortSignal.timeout(ms);
+  }
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms);
+  return c.signal;
+}
+
 function horizonsCalendarUtc(d) {
   const mo = MONTHS[d.getUTCMonth()];
   const day = String(d.getUTCDate()).padStart(2, "0");
@@ -23,8 +34,14 @@ function apiPath() {
   if (location.protocol === "file:") return null;
   const params = new URLSearchParams(location.search);
   const siteBase = params.get("site_base") || params.get("horizons_proxy");
-  if (siteBase) return (u) => `${siteBase.replace(/\/$/, "")}${u}`;
-  return (u) => u;
+  if (siteBase) {
+    const root = siteBase.replace(/\/$/, "");
+    return (u) => `${root}${u}`;
+  }
+  return (u) => {
+    const rel = u.startsWith("/") ? u.slice(1) : u;
+    return new URL(rel, location.href).href;
+  };
 }
 
 function buildQuery(center, start, stop) {
@@ -47,11 +64,20 @@ async function fetchHorizons(center, start, stop, resolveUrl) {
   const url = resolveUrl(`/api/horizons?${qs}`);
   const r = await fetch(url);
   const text = await r.text();
+  if (!r.ok) {
+    throw new Error(`Horizons proxy HTTP ${r.status}: ${text.trim().slice(0, 120)}`);
+  }
   let data;
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Invalid JSON from proxy");
+    const hint = text.trim().slice(0, 120).replace(/\s+/g, " ");
+    const looksHtml = hint.startsWith("<") || hint.toLowerCase().includes("<!doctype");
+    throw new Error(
+      looksHtml
+        ? "API returned HTML (not JSON). Use a host with Node/Netlify/Vercel proxies, or rely on relay fallback. If the app is in a subfolder, relative /api paths are fixed in this build — redeploy all files."
+        : `Invalid JSON from proxy: ${hint}`
+    );
   }
   if (data.error) throw new Error(String(data.error));
   if (typeof data.result !== "string") throw new Error("Unexpected Horizons response");
@@ -77,6 +103,35 @@ async function fetchLiveTelemetry(resolveUrl) {
     return null;
   }
   return j;
+}
+
+/** When /api/telemetry is missing (static hosting), same relay as standalone HTML. */
+async function fetchLiveTelemetryRelay() {
+  const r = await fetch(JINA_ORBIT, {
+    headers: { Accept: "application/json" },
+    signal: timeoutSignal(25000),
+  });
+  if (!r.ok) return null;
+  const w = await r.json();
+  const inner = w?.data?.content;
+  if (typeof inner !== "string") return null;
+  let orbit;
+  try {
+    orbit = JSON.parse(inner);
+  } catch {
+    return null;
+  }
+  if (typeof orbit.earthDistKm !== "number" || typeof orbit.speedKmS !== "number") return null;
+  return {
+    source: "live",
+    relay: true,
+    metMs: orbit.metMs,
+    speedMph: orbit.speedKmS * KPS_TO_MPH,
+    earthDistMi: orbit.earthDistKm * KM_TO_MI,
+    altitudeMi: orbit.altitudeKm * KM_TO_MI,
+    earthDistKm: orbit.earthDistKm,
+    moonDistKm: orbit.moonDistKm,
+  };
 }
 
 function parseLastVectorBlock(resultText) {
@@ -166,9 +221,16 @@ let lastFetchAt = 0;
 let lastSource = null;
 
 async function refreshTelemetry(resolveUrl) {
-  const live = await fetchLiveTelemetry(resolveUrl);
+  let live = await fetchLiveTelemetry(resolveUrl);
+  if (!live && location.protocol !== "file:") {
+    try {
+      live = await fetchLiveTelemetryRelay();
+    } catch {
+      live = null;
+    }
+  }
   if (live) {
-    lastSource = "live";
+    lastSource = live.relay ? "relay" : "live";
     lastGood = {
       source: "live",
       metMs: live.metMs,
@@ -219,7 +281,7 @@ async function refreshTelemetry(resolveUrl) {
 
 function paint() {
   const now = Date.now();
-  if (lastGood?.source === "live" && lastGood.metMs != null) {
+  if (lastGood?.metMs != null) {
     $("met").textContent = formatMETFromMs(lastGood.metMs);
   } else {
     $("met").textContent = formatMETWallClock(now);
@@ -233,7 +295,12 @@ function paint() {
   $("phase-val").textContent = lastGood.phase;
 
   const ageSec = Math.max(0, Math.floor((now - lastFetchAt) / 1000));
-  const tag = lastSource === "live" ? "Live orbit" : "Horizons";
+  const tag =
+    lastSource === "relay"
+      ? "Live orbit (relay)"
+      : lastSource === "live"
+        ? "Live orbit"
+        : "Horizons";
   $("data-age").textContent = `${tag} · ${ageSec}s ago`;
 }
 
@@ -250,7 +317,7 @@ async function tick(resolveUrl) {
     );
   }
   paint();
-  const delay = lastSource === "live" ? POLL_LIVE_MS : POLL_HORIZONS_MS;
+  const delay = lastSource === "live" || lastSource === "relay" ? POLL_LIVE_MS : POLL_HORIZONS_MS;
   setTimeout(() => tick(resolveUrl), delay);
 }
 

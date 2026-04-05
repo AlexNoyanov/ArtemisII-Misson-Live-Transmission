@@ -111,7 +111,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const ext = path.extname(filePath);
-  send(res, 200, fs.readFileSync(filePath), { "Content-Type": MIME[ext] || "application/octet-stream" });
+  const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
+  if (ext === ".html") {
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+  }
+  send(res, 200, fs.readFileSync(filePath), headers);
 });
 
 function listenWithFallback(server, startPort) {
