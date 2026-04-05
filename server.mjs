@@ -2,8 +2,35 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { fetchLiveOrbitPayload } from "./lib/telemetry-live.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function loadLocalEnv() {
+  try {
+    const envPath = path.join(__dirname, ".env");
+    if (!fs.existsSync(envPath)) return;
+    const text = fs.readFileSync(envPath, "utf8");
+    for (const line of text.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith("#")) continue;
+      const i = t.indexOf("=");
+      if (i === -1) continue;
+      const key = t.slice(0, i).trim();
+      let val = t.slice(i + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] === undefined) process.env[key] = val;
+    }
+  } catch {
+    /* ignore */
+  }
+}
+loadLocalEnv();
 const PUBLIC = path.join(__dirname, "public");
 const PREFERRED_PORT = Number(process.env.PORT) || 3000;
 const PORT_ATTEMPTS = 50;
@@ -31,6 +58,25 @@ async function proxyHorizons(search) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
+
+  if (url.pathname === "/api/telemetry") {
+    try {
+      const payload = await fetchLiveOrbitPayload();
+      send(res, 200, JSON.stringify(payload), {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=5",
+      });
+    } catch (e) {
+      send(
+        res,
+        502,
+        JSON.stringify({ error: String(e.message) }),
+        { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" }
+      );
+    }
+    return;
+  }
 
   if (url.pathname === "/api/horizons") {
     try {

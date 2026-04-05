@@ -1,3 +1,6 @@
 {
-  "functions": { "api/horizons.js": { "maxDuration": 30 } }
+  "functions": {
+    "api/horizons.js": { "maxDuration": 30 },
+    "api/telemetry.js": { "maxDuration": 30 }
+  }
 }

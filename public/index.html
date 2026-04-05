@@ -198,13 +198,13 @@
     </footer>
 
     <p class="fine-print">
-      Speed and geometry use NASA/JPL
-      <a href="https://ssd.jpl.nasa.gov/horizons/" rel="noopener noreferrer">Horizons</a>
-      state vectors for Artemis II (ID −1024), Earth center (399), relative to Earth equator/J2000 ecliptic frame.
-      Ephemeris begins after nominal ICPS separation. Mission elapsed time uses the published launch UTC from the same
-      ephemeris record. If you host static files only, point the app at a deployment that includes the
-      <code>/api/horizons</code> proxy (this repo’s Netlify/Vercel config or <code>npm start</code>), or add
-      <code>?site_base=https://your-proxy-host</code> to the URL. This page is not an official NASA product.
+      When available, speed, distance, altitude, and mission elapsed time come from a live AROW-style orbit feed (proxied
+      at <code>/api/telemetry</code>, no API key in the browser). If that feed is unavailable, values fall back to NASA/JPL
+      <a href="https://ssd.jpl.nasa.gov/horizons/" rel="noopener noreferrer">Horizons</a> ephemeris for Artemis II (ID
+      −1024). Horizons uses planned trajectory segments after ICPS separation; MET in fallback mode is computed from the
+      published launch UTC. Host with <code>npm start</code> or the included Netlify/Vercel proxies; optional
+      <code>NASA_API_KEY</code> (api.nasa.gov / api.data.gov) may be set only in server environment variables for future
+      features—never commit it. This page is not an official NASA product.
     </p>
 
     <script src="app.js" type="module"></script>

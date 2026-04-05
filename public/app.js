@@ -1,4 +1,4 @@
-/** Artemis II published launch (from JPL Horizons object summary, mission record). */
+/** Artemis II published launch (Horizons fallback / cross-check). */
 const LAUNCH_MS = Date.parse("2026-04-01T22:35:12.000Z");
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -6,6 +6,9 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const EARTH_RADIUS_MI = 3958.756;
 const KM_TO_MI = 0.621371192;
 const KPS_TO_MPH = 2236.9362920544;
+
+const POLL_LIVE_MS = 8000;
+const POLL_HORIZONS_MS = 30000;
 
 function horizonsCalendarUtc(d) {
   const mo = MONTHS[d.getUTCMonth()];
@@ -53,6 +56,27 @@ async function fetchHorizons(center, start, stop, resolveUrl) {
   if (data.error) throw new Error(String(data.error));
   if (typeof data.result !== "string") throw new Error("Unexpected Horizons response");
   return data.result;
+}
+
+async function fetchLiveTelemetry(resolveUrl) {
+  const r = await fetch(resolveUrl("/api/telemetry"));
+  if (!r.ok) return null;
+  let j;
+  try {
+    j = await r.json();
+  } catch {
+    return null;
+  }
+  if (j.error || j.source !== "live") return null;
+  if (
+    typeof j.metMs !== "number" ||
+    typeof j.speedMph !== "number" ||
+    typeof j.earthDistMi !== "number" ||
+    typeof j.altitudeMi !== "number"
+  ) {
+    return null;
+  }
+  return j;
 }
 
 function parseLastVectorBlock(resultText) {
@@ -103,9 +127,18 @@ function trajectoryPhase(earthRgKm, moonRgKm) {
   return "LUNAR TRANSIT";
 }
 
-function formatMET(nowMs) {
+function formatMETWallClock(nowMs) {
   if (nowMs < LAUNCH_MS) return "PRE-LAUNCH";
   const sec = Math.floor((nowMs - LAUNCH_MS) / 1000);
+  return formatSecondsAsMET(sec);
+}
+
+function formatMETFromMs(metMs) {
+  const sec = Math.floor(metMs / 1000);
+  return formatSecondsAsMET(sec);
+}
+
+function formatSecondsAsMET(sec) {
   const d = Math.floor(sec / 86400);
   const h = Math.floor((sec % 86400) / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -130,8 +163,24 @@ function $(id) {
 
 let lastGood = null;
 let lastFetchAt = 0;
+let lastSource = null;
 
 async function refreshTelemetry(resolveUrl) {
+  const live = await fetchLiveTelemetry(resolveUrl);
+  if (live) {
+    lastSource = "live";
+    lastGood = {
+      source: "live",
+      metMs: live.metMs,
+      mph: live.speedMph,
+      distMi: live.earthDistMi,
+      altMi: live.altitudeMi,
+      phase: trajectoryPhase(live.earthDistKm, live.moonDistKm),
+    };
+    lastFetchAt = Date.now();
+    return;
+  }
+
   const end = new Date();
   const start = new Date(end.getTime() - 4 * 60 * 1000);
   const stop = new Date(end.getTime() + 2 * 60 * 1000);
@@ -156,18 +205,25 @@ async function refreshTelemetry(resolveUrl) {
     if (moon) moonRgKm = moon.rgKm;
   }
 
-  const mph = speedMph(earth.vx, earth.vy, earth.vz);
-  const distMi = distanceEarthMi(earth.rgKm);
-  const altMi = altitudeMi(earth.rgKm);
-  const phase = trajectoryPhase(earth.rgKm, moonRgKm);
-
-  lastGood = { mph, distMi, altMi, phase };
+  lastSource = "horizons";
+  lastGood = {
+    source: "horizons",
+    metMs: null,
+    mph: speedMph(earth.vx, earth.vy, earth.vz),
+    distMi: distanceEarthMi(earth.rgKm),
+    altMi: altitudeMi(earth.rgKm),
+    phase: trajectoryPhase(earth.rgKm, moonRgKm),
+  };
   lastFetchAt = Date.now();
 }
 
 function paint() {
   const now = Date.now();
-  $("met").textContent = formatMET(now);
+  if (lastGood?.source === "live" && lastGood.metMs != null) {
+    $("met").textContent = formatMETFromMs(lastGood.metMs);
+  } else {
+    $("met").textContent = formatMETWallClock(now);
+  }
 
   if (!lastGood) return;
 
@@ -177,10 +233,11 @@ function paint() {
   $("phase-val").textContent = lastGood.phase;
 
   const ageSec = Math.max(0, Math.floor((now - lastFetchAt) / 1000));
-  $("data-age").textContent = `vectors ${ageSec}s ago`;
+  const tag = lastSource === "live" ? "Live orbit" : "Horizons";
+  $("data-age").textContent = `${tag} · ${ageSec}s ago`;
 }
 
-async function loop(resolveUrl) {
+async function tick(resolveUrl) {
   try {
     await refreshTelemetry(resolveUrl);
     setBanner("");
@@ -193,13 +250,15 @@ async function loop(resolveUrl) {
     );
   }
   paint();
+  const delay = lastSource === "live" ? POLL_LIVE_MS : POLL_HORIZONS_MS;
+  setTimeout(() => tick(resolveUrl), delay);
 }
 
 function main() {
   const resolveUrl = apiPath();
   if (!resolveUrl) {
     setBanner(
-      "Open this app through the local server (npm start) or deploy with the included /api/horizons proxy. JPL Horizons does not allow browser calls from file:// or cross-origin pages."
+      "Open this app through the local server (npm start) or deploy with the included API proxies. JPL Horizons does not allow browser calls from file:// or cross-origin pages."
     );
     $("met").textContent = "—";
     return;
@@ -208,8 +267,7 @@ function main() {
   $("fuel-val").textContent = "N/A";
 
   setInterval(() => paint(), 1000);
-  void loop(resolveUrl);
-  setInterval(() => void loop(resolveUrl), 30_000);
+  void tick(resolveUrl);
 }
 
 main();

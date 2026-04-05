@@ -7,3 +7,9 @@
   to = "/.netlify/functions/horizons"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/api/telemetry"
+  to = "/.netlify/functions/telemetry"
+  status = 200
+  force = true
