@@ -302,6 +302,10 @@ body {
   gap: 1.25rem;
 }
 
+footer.grid-orbit-extra {
+  margin-top: 1.25rem;
+}
+
 .tile {
   display: flex;
   flex-direction: column;

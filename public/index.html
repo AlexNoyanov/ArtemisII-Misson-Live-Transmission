@@ -269,9 +269,76 @@
       </div>
     </footer>
 
+    <div class="rule"></div>
+
+    <footer class="grid-4 grid-orbit-extra" aria-label="Extended orbit telemetry">
+      <div class="tile">
+        <span class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
+            <path d="M6 22 L22 10" />
+            <path d="M18 8 L24 8 L24 14" />
+          </svg>
+        </span>
+        <div class="label-small">SPEED (KM/S)</div>
+        <div id="oe-kms" class="tile-val">—</div>
+      </div>
+      <div class="tile">
+        <span class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
+            <path d="M8 20 L14 12 L20 18 L26 10" />
+            <circle cx="8" cy="20" r="1.2" fill="currentColor" stroke="none" />
+            <circle cx="26" cy="10" r="1.2" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        <div class="label-small">SPEED (KM/H)</div>
+        <div id="oe-kmh" class="tile-val">—</div>
+      </div>
+      <div class="tile">
+        <span class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
+            <circle cx="18" cy="16" r="8" />
+            <path d="M10 16 A8 8 0 0 1 22 10" opacity="0.45" />
+          </svg>
+        </span>
+        <div class="label-small">MOON RANGE</div>
+        <div id="oe-moon" class="tile-val">—</div>
+      </div>
+      <div class="tile">
+        <span class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
+            <ellipse cx="16" cy="16" rx="12" ry="6" />
+            <circle cx="16" cy="22" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        <div class="label-small">PERIAPSIS</div>
+        <div id="oe-peri" class="tile-val">—</div>
+      </div>
+      <div class="tile">
+        <span class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
+            <ellipse cx="16" cy="16" rx="12" ry="6" />
+            <circle cx="16" cy="10" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        <div class="label-small">APOAPSIS</div>
+        <div id="oe-apo" class="tile-val">—</div>
+      </div>
+      <div class="tile">
+        <span class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="9" y="9" width="14" height="14" rx="2" />
+            <path d="M12 20h8 M16 12v8" opacity="0.55" />
+          </svg>
+        </span>
+        <div class="label-small">G-FORCE</div>
+        <div id="oe-g" class="tile-val">—</div>
+      </div>
+    </footer>
+
     <p class="fine-print">
       When available, speed, distance, altitude, and mission elapsed time come from a live AROW-style orbit feed (proxied
-      at <code>/api/telemetry</code>, no API key in the browser). If that feed is unavailable, values fall back to NASA/JPL
+      at <code>/api/telemetry</code>, no API key in the browser). That upstream feed often updates as a snapshot, so the
+      dashboard extrapolates hero values slightly between refreshes when MET is unchanged. If that feed is unavailable, values fall back to NASA/JPL
       <a href="https://ssd.jpl.nasa.gov/horizons/" rel="noopener noreferrer">Horizons</a> ephemeris for Artemis II (ID
       −1024). Horizons uses planned trajectory segments after ICPS separation; MET in fallback mode is computed from the
       published launch UTC. Host with <code>npm start</code> or the included Netlify/Vercel proxies; optional

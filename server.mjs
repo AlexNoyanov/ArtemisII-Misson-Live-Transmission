@@ -65,7 +65,7 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, JSON.stringify(payload), {
         "Content-Type": "application/json; charset=utf-8",
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=5",
+        "Cache-Control": "no-store",
       });
     } catch (e) {
       send(

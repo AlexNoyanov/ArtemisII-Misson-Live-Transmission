@@ -12,7 +12,14 @@ const KPS_TO_MPH = 2236.9362920544;
 const POLL_LIVE_MS = 8000;
 const POLL_HORIZONS_MS = 30000;
 
-const JINA_ORBIT = "https://r.jina.ai/http://artemis.cdnspace.ca/api/orbit";
+const JINA_ORBIT_BASE = "https://r.jina.ai/http://artemis.cdnspace.ca/api/orbit";
+
+/** Avoid browser/CDN/Jina caching the same orbit JSON between polls. */
+function jinaOrbitUrl() {
+  return `${JINA_ORBIT_BASE}?_=${Date.now()}`;
+}
+/** Browser cannot call JPL Horizons directly (CORS). Static hosts often lack /api/horizons — relay via Jina (third party). */
+const JINA_HORIZONS = "https://r.jina.ai/https://ssd.jpl.nasa.gov/api/horizons.api";
 
 function timeoutSignal(ms) {
   if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
@@ -61,33 +68,76 @@ function buildQuery(center, start, stop) {
   return p.toString();
 }
 
+function horizonsBodyLooksHtml(text) {
+  const t = text.trim().slice(0, 120).toLowerCase();
+  return t.startsWith("<!") || t.includes("<html") || t.includes("<!doctype");
+}
+
+/** Unwrap Jina Reader JSON → Horizons API JSON string in data.content. */
+async function fetchHorizonsViaJinaRelay(center, start, stop) {
+  const qs = buildQuery(center, start, stop);
+  const url = `${JINA_HORIZONS}?${qs}`;
+  const r = await fetch(url, {
+    headers: { Accept: "application/json" },
+    signal: timeoutSignal(30000),
+    cache: "no-store",
+  });
+  if (!r.ok) throw new Error(`Horizons relay HTTP ${r.status}`);
+  const wrapper = await r.json();
+  const inner = wrapper?.data?.content;
+  if (typeof inner !== "string") throw new Error("Horizons relay: unexpected response shape");
+  let data;
+  try {
+    data = JSON.parse(inner);
+  } catch {
+    throw new Error("Horizons relay: invalid JSON in content");
+  }
+  if (data.error) throw new Error(String(data.error));
+  if (typeof data.result !== "string") throw new Error("Unexpected Horizons relay body");
+  return data.result;
+}
+
 async function fetchHorizons(center, start, stop, resolveUrl) {
   const qs = buildQuery(center, start, stop);
-  const url = resolveUrl(`/api/horizons?${qs}`);
-  const r = await fetch(url);
-  const text = await r.text();
-  if (!r.ok) {
-    throw new Error(`Horizons proxy HTTP ${r.status}: ${text.trim().slice(0, 120)}`);
+  const proxyUrl = resolveUrl(`/api/horizons?${qs}`);
+  let r;
+  let text;
+  try {
+    r = await fetch(proxyUrl, { signal: timeoutSignal(25000), cache: "no-store" });
+    text = await r.text();
+  } catch (e) {
+    if (e.name === "AbortError") throw e;
+    return fetchHorizonsViaJinaRelay(center, start, stop);
   }
+
+  if (horizonsBodyLooksHtml(text) || r.status === 404 || r.status === 403) {
+    return fetchHorizonsViaJinaRelay(center, start, stop);
+  }
+
   let data;
   try {
     data = JSON.parse(text);
   } catch {
-    const hint = text.trim().slice(0, 120).replace(/\s+/g, " ");
-    const looksHtml = hint.startsWith("<") || hint.toLowerCase().includes("<!doctype");
-    throw new Error(
-      looksHtml
-        ? "API returned HTML (not JSON). Use a host with Node/Netlify/Vercel proxies, or rely on relay fallback. If the app is in a subfolder, relative /api paths are fixed in this build — redeploy all files."
-        : `Invalid JSON from proxy: ${hint}`
-    );
+    if (r.status === 404 || r.status === 403) return fetchHorizonsViaJinaRelay(center, start, stop);
+    throw new Error(`Horizons proxy HTTP ${r.status}: ${text.trim().slice(0, 120)}`);
   }
+
   if (data.error) throw new Error(String(data.error));
-  if (typeof data.result !== "string") throw new Error("Unexpected Horizons response");
+  if (typeof data.result !== "string") {
+    if (!r.ok) return fetchHorizonsViaJinaRelay(center, start, stop);
+    throw new Error("Unexpected Horizons response");
+  }
+  if (!r.ok) {
+    throw new Error(`Horizons proxy HTTP ${r.status}: ${text.trim().slice(0, 120)}`);
+  }
   return data.result;
 }
 
 async function fetchLiveTelemetry(resolveUrl) {
-  const r = await fetch(resolveUrl("/api/telemetry"));
+  const r = await fetch(resolveUrl("/api/telemetry"), {
+    cache: "no-store",
+    signal: timeoutSignal(20000),
+  });
   if (!r.ok) return null;
   let j;
   try {
@@ -104,14 +154,31 @@ async function fetchLiveTelemetry(resolveUrl) {
   ) {
     return null;
   }
-  return j;
+  const orbitExtras =
+    j.orbitExtras != null && typeof j.orbitExtras === "object" && !Array.isArray(j.orbitExtras)
+      ? j.orbitExtras
+      : null;
+  return { ...j, orbitExtras };
 }
 
 /** When /api/telemetry is missing (static hosting), same relay as standalone HTML. */
+function orbitExtrasFromOrbit(orbit) {
+  if (!orbit || typeof orbit !== "object") return null;
+  const o = {};
+  if (typeof orbit.speedKmS === "number") o.speedKmS = orbit.speedKmS;
+  if (typeof orbit.speedKmH === "number") o.speedKmH = orbit.speedKmH;
+  if (typeof orbit.moonDistKm === "number") o.moonDistKm = orbit.moonDistKm;
+  if (typeof orbit.periapsisKm === "number") o.periapsisKm = orbit.periapsisKm;
+  if (typeof orbit.apoapsisKm === "number") o.apoapsisKm = orbit.apoapsisKm;
+  if (typeof orbit.gForce === "number") o.gForce = orbit.gForce;
+  return Object.keys(o).length ? o : null;
+}
+
 async function fetchLiveTelemetryRelay() {
-  const r = await fetch(JINA_ORBIT, {
+  const r = await fetch(jinaOrbitUrl(), {
     headers: { Accept: "application/json" },
     signal: timeoutSignal(25000),
+    cache: "no-store",
   });
   if (!r.ok) return null;
   const w = await r.json();
@@ -133,6 +200,7 @@ async function fetchLiveTelemetryRelay() {
     altitudeMi: orbit.altitudeKm * KM_TO_MI,
     earthDistKm: orbit.earthDistKm,
     moonDistKm: orbit.moonDistKm,
+    orbitExtras: orbitExtrasFromOrbit(orbit),
   };
 }
 
@@ -163,6 +231,88 @@ function parseLastVectorBlock(resultText) {
 
 function formatCommaInt(n) {
   return Math.round(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+/** Hero readout: one decimal so small feed changes are visible (integers often look “stuck”). */
+function formatHeroNumber(n) {
+  const x = Math.round(Number(n) * 10) / 10;
+  return x.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+/**
+ * Public orbit CDN often serves unchanged snapshots for a long time; between updates, extrapolate
+ * speed/distance/alt along mission time using the last segment where MET actually advanced.
+ */
+let orbitDrift = {
+  rMphPerMetMs: 0,
+  rDistPerMetMs: 0,
+  rAltPerMetMs: 0,
+  met: null,
+  mph: null,
+  dist: null,
+  alt: null,
+  /** How many polls in a row returned the same MET (CDN snapshot not advancing). */
+  staleMetPolls: 0,
+};
+
+function resetOrbitDrift() {
+  orbitDrift = {
+    rMphPerMetMs: 0,
+    rDistPerMetMs: 0,
+    rAltPerMetMs: 0,
+    met: null,
+    mph: null,
+    dist: null,
+    alt: null,
+    staleMetPolls: 0,
+  };
+}
+
+function updateOrbitDriftFromLive(live) {
+  const m = live.metMs;
+  const mph = live.speedMph;
+  const dist = live.earthDistMi;
+  const alt = live.altitudeMi;
+  if (orbitDrift.met != null && m === orbitDrift.met) {
+    orbitDrift.staleMetPolls += 1;
+  } else {
+    orbitDrift.staleMetPolls = 0;
+  }
+  if (orbitDrift.met != null && m > orbitDrift.met) {
+    const dm = m - orbitDrift.met;
+    orbitDrift.rMphPerMetMs = (mph - orbitDrift.mph) / dm;
+    orbitDrift.rDistPerMetMs = (dist - orbitDrift.dist) / dm;
+    orbitDrift.rAltPerMetMs = (alt - orbitDrift.alt) / dm;
+    if (!Number.isFinite(orbitDrift.rMphPerMetMs) || Math.abs(orbitDrift.rMphPerMetMs) > 0.01) {
+      orbitDrift.rMphPerMetMs = 0;
+    }
+    if (!Number.isFinite(orbitDrift.rDistPerMetMs) || Math.abs(orbitDrift.rDistPerMetMs) > 0.02) {
+      orbitDrift.rDistPerMetMs = 0;
+    }
+    if (!Number.isFinite(orbitDrift.rAltPerMetMs) || Math.abs(orbitDrift.rAltPerMetMs) > 0.02) {
+      orbitDrift.rAltPerMetMs = 0;
+    }
+  }
+  orbitDrift.met = m;
+  orbitDrift.mph = mph;
+  orbitDrift.dist = dist;
+  orbitDrift.alt = alt;
+}
+
+/**
+ * When the public feed repeats the same MET for multiple polls, there is no real d(value)/d(met).
+ * Approximate smooth motion using a small fraction of reported speed as nominal radial mi/s (order-of-magnitude
+ * for translunar leg — illustrative between upstream refreshes, not navigation-grade).
+ */
+function staleSnapshotDriftMiPerMs(mph) {
+  const miPerSec = mph / 3600;
+  const frac = 0.035;
+  return (frac * miPerSec) / 1000;
+}
+
+function staleSnapshotDriftMphPerMs() {
+  const maxDeltaMphPerSec = 0.04;
+  return maxDeltaMphPerSec / 1000;
 }
 
 function speedMph(vx, vy, vz) {
@@ -221,6 +371,8 @@ function $(id) {
 let lastGood = null;
 let lastFetchAt = 0;
 let lastSource = null;
+/** Live-feed-only extended orbit fields (speed km/s·h, moon range, apsides, g). */
+let lastOrbitExtras = null;
 
 async function refreshTelemetry(resolveUrl) {
   let live = await fetchLiveTelemetry(resolveUrl);
@@ -233,6 +385,11 @@ async function refreshTelemetry(resolveUrl) {
   }
   if (live) {
     lastSource = live.relay ? "relay" : "live";
+    lastOrbitExtras =
+      live.orbitExtras != null && typeof live.orbitExtras === "object" && !Array.isArray(live.orbitExtras)
+        ? live.orbitExtras
+        : null;
+    updateOrbitDriftFromLive(live);
     lastGood = {
       source: "live",
       metMs: live.metMs,
@@ -270,6 +427,8 @@ async function refreshTelemetry(resolveUrl) {
   }
 
   lastSource = "horizons";
+  lastOrbitExtras = null;
+  resetOrbitDrift();
   lastGood = {
     source: "horizons",
     metMs: null,
@@ -281,19 +440,72 @@ async function refreshTelemetry(resolveUrl) {
   lastFetchAt = Date.now();
 }
 
+function paintOrbitExtras() {
+  const dash = "—";
+  const x =
+    lastOrbitExtras != null && typeof lastOrbitExtras === "object" && !Array.isArray(lastOrbitExtras)
+      ? lastOrbitExtras
+      : null;
+  const set = (id, v) => {
+    const el = $(id);
+    if (el) el.textContent = v;
+  };
+  if (!x) {
+    ["oe-kms", "oe-kmh", "oe-moon", "oe-peri", "oe-apo", "oe-g"].forEach((id) => set(id, dash));
+    return;
+  }
+  set("oe-kms", x.speedKmS != null ? `${x.speedKmS.toFixed(3)} KM/S` : dash);
+  set("oe-kmh", x.speedKmH != null ? `${Math.round(x.speedKmH).toLocaleString("en-US")} KM/H` : dash);
+  set("oe-moon", x.moonDistKm != null ? `${formatCommaInt(x.moonDistKm * KM_TO_MI)} MI` : dash);
+  set("oe-peri", x.periapsisKm != null ? `${Math.round(x.periapsisKm).toLocaleString("en-US")} KM` : dash);
+  set("oe-apo", x.apoapsisKm != null ? `${Math.round(x.apoapsisKm).toLocaleString("en-US")} KM` : dash);
+  set("oe-g", x.gForce != null ? `${x.gForce.toFixed(6)} g` : dash);
+}
+
 function paint() {
   const now = Date.now();
-  if (lastGood?.metMs != null) {
-    $("met").textContent = formatMETFromMs(lastGood.metMs);
+  // Live feed gives MET at fetch time; advance by wall clock between polls so the display ticks.
+  if (lastGood?.metMs != null && typeof lastGood.metMs === "number") {
+    const skew = lastFetchAt > 0 ? Math.max(0, now - lastFetchAt) : 0;
+    $("met").textContent = formatMETFromMs(lastGood.metMs + skew);
   } else {
     $("met").textContent = formatMETWallClock(now);
   }
 
+  paintOrbitExtras();
+
   if (!lastGood) return;
 
-  $("speed-val").textContent = formatCommaInt(lastGood.mph);
-  $("dist-val").textContent = formatCommaInt(lastGood.distMi);
-  $("alt-val").textContent = `${formatCommaInt(lastGood.altMi)} MI`;
+  let mphOut = lastGood.mph;
+  let distOut = lastGood.distMi;
+  let altOut = lastGood.altMi;
+  if (
+    (lastSource === "live" || lastSource === "relay") &&
+    lastGood.metMs != null &&
+    typeof lastGood.metMs === "number" &&
+    lastFetchAt > 0
+  ) {
+    const skew = Math.max(0, now - lastFetchAt);
+    mphOut += orbitDrift.rMphPerMetMs * skew;
+    distOut += orbitDrift.rDistPerMetMs * skew;
+    altOut += orbitDrift.rAltPerMetMs * skew;
+    if (
+      orbitDrift.staleMetPolls >= 1 &&
+      orbitDrift.rDistPerMetMs === 0 &&
+      orbitDrift.rMphPerMetMs === 0 &&
+      orbitDrift.rAltPerMetMs === 0
+    ) {
+      const kMi = staleSnapshotDriftMiPerMs(lastGood.mph);
+      const kMph = staleSnapshotDriftMphPerMs();
+      distOut += kMi * skew;
+      altOut += kMi * skew;
+      mphOut += kMph * skew;
+    }
+  }
+
+  $("speed-val").textContent = formatHeroNumber(mphOut);
+  $("dist-val").textContent = formatHeroNumber(distOut);
+  $("alt-val").textContent = `${formatHeroNumber(altOut)} MI`;
   $("phase-val").textContent = lastGood.phase;
 
   const ageSec = Math.max(0, Math.floor((now - lastFetchAt) / 1000));
