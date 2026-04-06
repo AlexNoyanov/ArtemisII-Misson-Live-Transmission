@@ -8,7 +8,9 @@ Run the script (phpMyAdmin “SQL” tab, or `mysql` CLI):
 
 **`db/analytics_init.sql`**
 
-It runs `USE analytics;` and `CREATE TABLE page_visits ...`. Commented at the bottom: grant **INSERT** only on `page_visits` for `app_logger` (set the password in your hosting panel; do not put passwords in `.sql` files or Git).
+It runs `USE analytics;` and creates **`page_visits`** and **`analytics_user_devices`**. Commented at the bottom: grant **INSERT** on `page_visits` and **INSERT, UPDATE** on `analytics_user_devices` for `app_logger` (set the password in your hosting panel; do not put passwords in `.sql` files or Git).
+
+**Existing databases:** run **`db/analytics_user_devices.mysql.sql`** once if you already created `page_visits` before this table existed, then grant **UPDATE** on `analytics_user_devices` if the DB user only had INSERT on `page_visits`.
 
 ## 2. Server database config (required — without this, the table stays empty)
 
@@ -36,6 +38,8 @@ If this password was ever pasted into chat or a ticket, **rotate it** in the pan
 From `analytics-api/templates/php/` copy to your host:
 
 - `visit.php`
+- `geo_resolve.php` (required alongside `visit.php` — geolocation helpers)
+- `user_device_store.php` (required — upserts `analytics_user_devices` per pseudonymous `userId`)
 - `.htaccess` (optional if your host sets CORS elsewhere; PHP already sends CORS headers)
 
 Plus **`config.php`** created on the server (not from a committed file with a real password).
@@ -58,11 +62,11 @@ Public URL should match what the frontend uses, e.g.
 
 - Set `'ingest_token'` in `config.php` to a long random string and set `window.__ARTEMIS_ANALYTICS_TOKEN__` in a **deploy-only** inline script before `app.js` loads (do not commit the token).
 - Tighten CORS: replace `Access-Control-Allow-Origin: *` with your real app origin in `.htaccess` or PHP.
-- MySQL user `app_logger`: only **INSERT** on `analytics.page_visits` (see SQL comments).
+- MySQL user `app_logger`: **INSERT** on `analytics.page_visits` and **INSERT, UPDATE** on `analytics.analytics_user_devices` (see SQL comments).
 
 ## 5. Frontend
 
-`public/analytics-client.js` posts one event per load. Override URL with `?analytics_endpoint=` or set `window.__ARTEMIS_ANALYTICS_URL__` before the module runs (recommended for deploy-specific URLs without editing tracked JS).
+`public/analytics-client.js` posts one event per load (includes stable **`userId`** in `localStorage`, **`deviceName`** heuristic, **`timezone`**, and **`devicePixelRatio`**). Override URL with `?analytics_endpoint=` or set `window.__ARTEMIS_ANALYTICS_URL__` before the module runs (recommended for deploy-specific URLs without editing tracked JS).
 
 ## Privacy
 
